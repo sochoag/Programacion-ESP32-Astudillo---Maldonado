@@ -43,29 +43,12 @@ void reconnect()
     {
       Serial.println("connected");
 
-      // Anuncio de Conexion exitosa -- Once connected, publish an announcement...//
-
-      client.publish("8cBAzaR8Jiya7Fq/mensaje", "Coneccion exitosa a topico Limpieza");
-      client.publish("30M3qAhyF0GsxTL/mensaje", "Coneccion exitosa a topico Alarmas");
-
       /////////////////////////Suscripcion a Topicos/////////////////////////////////////
       for(int i=0; i<tamanoModulos ; i++)
       {
         client.subscribe((topico_raiz+"/"+modulos[i]+"/#").c_str());
         Serial.println("Suscrito a:" + topico_raiz +"/"+modulos[i]+"/#");
       }
-      /*client.subscribe(topico_1.c_str());
-      client.subscribe(topico_2.c_str());
-      client.subscribe(topico_3.c_str());
-      client.subscribe(topico_4.c_str());
-      client.subscribe(topico_5.c_str());
-      client.subscribe(topico_6.c_str());
-      client.subscribe(topico_7.c_str());
-      client.subscribe(topico_8.c_str());
-      client.subscribe(topico_9.c_str());
-      client.subscribe(topico_10.c_str());*/
-      ///////////////////////////////////////////////////////////////////////////////////
-      // Resuscripcion -- and resubscribe
     }
     else
     {

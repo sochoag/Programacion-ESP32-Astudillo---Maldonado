@@ -1,10 +1,11 @@
 #include <Arduino.h>
-#include "Limpieza.h"
-#include "Alarma.h"
-#include "Estaciones.h"
 #include "secrets.h"
 #include "variables.h"
 #include "conexionesInalambricas.h"
+#include "Estaciones.h"
+#include "Maquinas.h"
+#include "Alarma.h"
+#include "Limpieza.h"
 
 void callback(char* topic, byte* payload, unsigned int length) 
 {
@@ -45,11 +46,12 @@ void callback(char* topic, byte* payload, unsigned int length)
     if(recepcion[1]==modulos[1])
     {
       Serial.println("Estas en el modulo:Alarma");
+      fAlarma(mensaje);
     }
-    if(recepcion[1]==modulos[2])
-    {
-      Serial.println("Estas en el modulo:Maquina");
-    }
+    // if(recepcion[1]==modulos[2])
+    // {
+    //   Serial.println("Estas en el modulo:Maquina");
+    // }
     if(recepcion[1]==modulos[3])
     {
       Serial.println("Estas en el modulo:Sensor");
@@ -59,59 +61,6 @@ void callback(char* topic, byte* payload, unsigned int length)
       Serial.println("Estas en el modulo:Alerta");
     }
   }
-
-  
-/*
-  
-  if((String)topic == topico_1)
-  {
-    ModuloLimp1(mensaje);
-  }
-  
-  if((String)topic == topico_2)
-  {
-    ModuloLimp2(mensaje);
-  }
-  
-  if((String)topic == topico_3)
-  {
-    ModuloLimp3(mensaje);
-  }
-
-  if((String)topic == topico_4)
-  {
-    ModuloLimp4(mensaje);
-  }
-
-  if((String)topic == topico_5)
-  {
-    ModuloLimp5(mensaje);
-  }
-  
-  if((String)topic == topico_6)
-  {
-    ModuloAlarm1(mensaje);
-  }*/
-/*
-  if((String)topic == topico_7)
-  {
-    ModuloAlarm2(mensaje);
-  }
-
-  if((String)topic == topico_8)
-  {
-    ModuloAlarm3(mensaje);
-  }
-
-  if((String)topic == topico_9)
-  {
-    ModuloAlarm4(mensaje);
-  }
-
-  if((String)topic == topico_10)
-  {
-    ModuloAlarm5(mensaje);
-  }*/
 }
 
 void setup ()
@@ -121,9 +70,9 @@ void setup ()
   
   pinMode(15,INPUT);        //Maqquina1--Pulsante
   pinMode(16,INPUT);        //Maqquina2--Pulsante
-  pinMode(4, OUTPUT);       //Alarma1--led amarillo
-  pinMode(5, OUTPUT);       //Alarma1--led rojo
   initLimpieza();
+  //initAlarma();           //Descomentar cuando se tenga los pines que son
+
 
 /////////////////////////////////////////////////////////////////////////  
   setup_wifi();
@@ -137,18 +86,14 @@ void loop()
   {
     reconnect();
   }
-  client.loop();
-
   unsigned long now = millis();
 
   // Envio de datos desde ESP hacia el broker cada 2 segundos
-  if (now - lastMsg > 10000) 
+  if ((now - lastMsg) > 5000) 
   {
     lastMsg = now;
-    ++value;
-    snprintf(msg, MSG_BUFFER_SIZE, "hello world # %i ", value);
-    //Serial.print("Publish message: ");
-    //Serial.println(msg);
-    //client.publish(topicoLimpieza.c_str(), msg);
+    activarMaquina(1, estadoMaquina);
+    estadoMaquina = !estadoMaquina;
   }
+  client.loop();
 }

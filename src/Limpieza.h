@@ -1,10 +1,7 @@
-#include "variables.h"
-
 void initLimpieza()
 {
   for(int i = 0; i < tamanoPinesLimpieza; i++)
   {
-    Serial.println("Iteracion:" + String(i) + "\t pin:" + String(pinesLimpieza[i]));
     pinMode(pinesLimpieza[i],OUTPUT);
   }
 }
