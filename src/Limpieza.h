@@ -1,13 +1,6 @@
-void initLimpieza()
-{
-  for(int i = 0; i < tamanoPinesLimpieza; i++)
-  {
-    pinMode(pinesLimpieza[i],OUTPUT);
-  }
-}
-
 void fLimpieza(int elemento, String mensaje)
 {
+  pinMode(pinesLimpieza[elemento-1], OUTPUT);
   if (mensaje == "Encendido")
   {
     digitalWrite(pinesLimpieza[elemento-1], HIGH);
@@ -21,5 +14,4 @@ void fLimpieza(int elemento, String mensaje)
     Serial.println("Comando desconocido");
     return;
   }
-  Serial.println("LED "+ String(pinesLimpieza[elemento-1]) +" "+ mensaje);
 }

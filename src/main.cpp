@@ -1,99 +1,123 @@
 #include <Arduino.h>
 #include "secrets.h"
 #include "variables.h"
-#include "conexionesInalambricas.h"
-#include "Estaciones.h"
-#include "Maquinas.h"
-#include "Alarma.h"
+#include "ModuleManage.h"
 #include "Limpieza.h"
+#include "Alarma.h"
+#include "conexionesInalambricas.h"
+#include "Maquinas.h"
+#include "Sensores.h"
+#include "Alerta.h"
+#include "adquisicion.h"
 
-void callback(char* topic, byte* payload, unsigned int length) 
+#define INCLUDE_vTaskSuspend 1
+#define INCLUDE_eTaskGetState 1
+
+TaskHandle_t WatchdogConexionesHandle;
+TaskHandle_t MaquinaPollingHandle;
+TaskHandle_t SensoresPublishHandle;
+
+void WatchdogConexiones(void * nada);
+void MaquinaPolling(void * nada);
+void SensoresPublish(void * nada);
+void AlertaTask(void * nada);
+
+void setup()
 {
-  // Tokening del topic
-  int it=0;
-  token = strtok(topic, "/");
-  recepcion[it] = token;
-  while(token != NULL)
-  {
-    it++;
-    //Serial.println(token);
-    token = strtok(NULL, "/");
-    recepcion[it] = token;
-  }
-
-  // Lectura del mensaje
-  String mensaje;
-  for (int i = 0; i < length; i++) {
-    mensaje = mensaje+(char)payload[i];
-  }
-  //Serial.println("Topico:"+String(topic)+"\t Mensaje:"+mensaje);
-
-  // Logica del programa
-  if(recepcion[0]==topico_raiz)
-  {
-    if(recepcion[1]==modulos[0])
-    {
-      Serial.println("Estas en el modulo:Limpieza");
-      if(recepcion[2].toInt() >= 1 && recepcion[2].toInt() <= tamanoPinesLimpieza)
-      {
-        fLimpieza(recepcion[2].toInt(), mensaje);
-      }
-      else
-      {
-        Serial.println("No existe el elemento");
-      }
-    }
-    if(recepcion[1]==modulos[1])
-    {
-      Serial.println("Estas en el modulo:Alarma");
-      fAlarma(mensaje);
-    }
-    // if(recepcion[1]==modulos[2])
-    // {
-    //   Serial.println("Estas en el modulo:Maquina");
-    // }
-    if(recepcion[1]==modulos[3])
-    {
-      Serial.println("Estas en el modulo:Sensor");
-    }
-    if(recepcion[1]==modulos[4])
-    {
-      Serial.println("Estas en el modulo:Alerta");
-    }
-  }
-}
-
-void setup ()
-{  
-  Serial.begin(115200);
-////////////////////////////Pines Usados ///////////////////////////////
-  
-  pinMode(15,INPUT);        //Maqquina1--Pulsante
-  pinMode(16,INPUT);        //Maqquina2--Pulsante
-  initLimpieza();
-  //initAlarma();           //Descomentar cuando se tenga los pines que son
-
-
-/////////////////////////////////////////////////////////////////////////  
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
-}
-
-void loop() 
-{
-  if (!client.connected()) 
-  {
+    Serial.begin(115200);
+    setup_connections();
     reconnect();
-  }
-  unsigned long now = millis();
+    xTaskCreate(WatchdogConexiones, "MQTT_Task", 10240, NULL, 4, NULL);
+    xTaskCreate(SensoresPublish, "SensoresPublish", 10240, NULL, 2, &SensoresPublishHandle);
+    xTaskCreate(MaquinaPolling, "Maquina_Polling", 10240, NULL, 1, &MaquinaPollingHandle);
+    xTaskCreate(AlertaTask, "Task Alerta", 10240, NULL, 2, NULL);
+}
 
-  // Envio de datos desde ESP hacia el broker cada 2 segundos
-  if ((now - lastMsg) > 5000) 
-  {
-    lastMsg = now;
-    activarMaquina(1, estadoMaquina);
-    estadoMaquina = !estadoMaquina;
-  }
-  client.loop();
+void loop()
+{
+}
+
+void WatchdogConexiones(void * nada)
+{
+    while (true)
+    {   
+        if (!client.connected()) 
+        {
+            reconnect();
+        }
+        client.loop();
+        vTaskDelay(500/portTICK_PERIOD_MS);
+    }
+}
+
+void MaquinaPolling(void * nada)
+{
+    bool lastValues[]={false,false};
+    bool values[]={true, true};
+
+    for(int i=0; i<tamanoPinesMaquina;i++)
+    {
+        pinMode(pinesMaquina[i], INPUT);
+    }
+
+    while (true)
+    {
+        for(int i=0; i<tamanoPinesMaquina; i++)
+        {
+            values[i] = digitalRead(pinesMaquina[i]);
+            if(lastValues[i] != values[i])
+            {
+                fMaquina(i+1,pinesMaquina[i]);
+            }
+
+            lastValues[i] = values[i];
+        }
+
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+    }    
+}
+
+void SensoresPublish(void * nada)
+{
+    for (int i = 0; i < tamanoPinesSensor; i++)
+    {
+        pinMode(digitalPinsSensor[i], OUTPUT);
+        pinMode(analogPinsSensor[i], INPUT);
+    }
+    
+    while (true)
+    {
+        for (int i = 0; i < tamanoPinesSensor; i++)
+        {
+            float valor = adquisicionDatos(digitalPinsSensor[i], analogPinsSensor[i]);
+            fSensor(i+1,valor);
+        }
+        vTaskDelay(10000/portTICK_PERIOD_MS);
+    }   
+}
+
+void AlertaTask(void * nada)
+{
+    bool lastValues[]={false,false};
+    bool values[]={true, true};
+
+    for(int i=0; i<tamanoPinesMaquina;i++)
+    {
+        pinMode(pinesAlerta[i], INPUT);
+    }
+
+    while (true)
+    {
+        for(int i=0; i<tamanoPinesAlerta; i++)
+        {
+            values[i] = digitalRead(pinesAlerta[i]);
+            if(lastValues[i] != values[i] && values[i])
+            {
+                fAlerta(i+1,pinesAlerta[i]);
+            }
+            lastValues[i] = values[i];
+        }
+
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+    }   
 }
