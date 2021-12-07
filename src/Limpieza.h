@@ -1,5 +1,7 @@
 void fLimpieza(int elemento, String mensaje)
 {
+  Serial.println("Limpieza - Mensaje recibido con exito!: "+(String)elemento+" "+mensaje);
+  
   pinMode(pinesLimpieza[elemento-1], OUTPUT);
   if (mensaje == "Encendido")
   {
