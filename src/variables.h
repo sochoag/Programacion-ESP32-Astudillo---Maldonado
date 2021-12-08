@@ -24,6 +24,8 @@ int pinesMaquina[]={21,19};
 
 int pinesAlerta[]={16,25};
 
+int pinesExtractor[]={34,15};
+
 int digitalPinsSensor[] = {18,35};
 int analogPinsSensor[] = {32,33};
 
@@ -46,5 +48,6 @@ int tamanoPinesAlarma = (sizeof(pinesAlarma)/sizeof(pinesAlarma[0]));
 int tamanoPinesMaquina = (sizeof(pinesMaquina)/sizeof(pinesMaquina[0]));
 int tamanoPinesSensor = (sizeof(digitalPinsSensor)/sizeof(digitalPinsSensor[0]));
 int tamanoPinesAlerta = (sizeof(pinesAlerta)/sizeof(pinesAlerta[0]));
+int tamanoPinesExtractor = (sizeof(pinesExtractor)/sizeof(pinesExtractor[0]));
 
 #endif

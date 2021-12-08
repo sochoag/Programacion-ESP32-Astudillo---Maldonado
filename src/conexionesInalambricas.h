@@ -28,12 +28,10 @@ void callback(char *topic, byte *payload, unsigned int length)
   {
     case 0: fLimpieza(recepcion[2].toInt(), mensaje); break;
     case 1: fAlarma(mensaje); break;
-    case 2: confirmacion(2); break;
-    case 3: confirmacion(3); break;
-    case 4: confirmacion(4); break;
-    case 5: confirmacion(5); break;
-    // case 4: fLimpieza(recepcion[2].toInt(), mensaje); break;
-    // case 5: fLimpieza(recepcion[2].toInt(), mensaje); break;
+    case 2: confirmacion(2, mensaje); break;
+    case 4: confirmacion(4, mensaje); break;
+    case 3: confirmacion(3, mensaje); break;
+    case 5: confirmacion(5, mensaje); break;
     default: Serial.println("No command"); break;
   }
 }
