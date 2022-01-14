@@ -1,6 +1,6 @@
 void fAlarma(String mensaje)
 {
-    Serial.println("Alarma - Mensaje recibido con exito!: " + mensaje);
+    debugln("Alarma - Mensaje recibido con exito!: " + mensaje);
 
     int i = 0;
 
@@ -39,34 +39,40 @@ void fAlarma(String mensaje)
     }
     else
     {
-        Serial.println("Comando desconocido 2");
+        debugln("Comando desconocido 2");
     }
 }
 
-void fAlerta(int alerta, int pin)
+void fAlerta(int alerta, String value)
 {
-    String mensaje = digitalRead(pin) ? "Encendido" : "Apagado";
+    String mensaje = value;
     String topico = topico_raiz + "/Alerta/" + String(alerta);
     client.publish(topico.c_str(), mensaje.c_str());
+    doc["Alerta"][alerta-1] = value;
+    enviarDatos();
 }
 
 void fLimpieza(int elemento, String mensaje)
 {
-    Serial.println("Limpieza - Mensaje recibido con exito!: " + (String)elemento + " " + mensaje);
-
-    pinMode(pinesLimpieza[elemento - 1], OUTPUT);
-    if (mensaje == "Encendido")
+    debugln("Limpieza - Mensaje recibido con exito!: " + (String)elemento + " " + mensaje);
+    if (elemento<=tamanoPinesLimpieza)
     {
-        digitalWrite(pinesLimpieza[elemento - 1], HIGH);
-    }
-    else if (mensaje == "Apagado")
-    {
-        digitalWrite(pinesLimpieza[elemento - 1], LOW);
-    }
-    else
-    {
-        Serial.println("Comando desconocido");
-        return;
+        pinMode(pinesLimpieza[elemento - 1], OUTPUT);
+        if (mensaje == "Encendido")
+        {
+            digitalWrite(pinesLimpieza[elemento - 1], HIGH);
+        }
+        else if (mensaje == "Apagado")
+        {
+            digitalWrite(pinesLimpieza[elemento - 1], LOW);
+        }
+        else
+        {
+            debugln("Comando desconocido");
+            return;
+        }
+        doc["Limpieza"][elemento-1] = mensaje == "Encendido" ? true : false;
+        enviarDatos();
     }
 }
 
@@ -75,6 +81,8 @@ void fExtractor(int maquina, int pin)
     String mensaje = digitalRead(pin) ? "Encendido" : "Apagado";
     String topico = topico_raiz + "/Extractor/" + String(maquina);
     client.publish(topico.c_str(), mensaje.c_str());
+    topico = topico_raiz + "/Limpieza/" + String(maquina);
+    client.publish(topico.c_str(), mensaje.c_str());
 }
 
 void fMaquina(int maquina, int pin)
@@ -82,6 +90,8 @@ void fMaquina(int maquina, int pin)
     String mensaje = digitalRead(pin) ? "Encendido" : "Apagado";
     String topico = topico_raiz + "/Maquina/" + String(maquina);
     client.publish(topico.c_str(), mensaje.c_str());
+    doc["Maquina"][maquina-1] = mensaje == "Encendido" ? true : false;
+    enviarDatos();
 }
 
 void fSensor(int sensor, float vsensor)
@@ -89,10 +99,11 @@ void fSensor(int sensor, float vsensor)
     //String mensaje = estado ? "Encendido" : "Apagado";
     // char topico[50];
     //snprintf(topico,50,"%s/%s/%d", topico_raiz.c_str(), modulos[2], maquina);
-    String mensaje = String(vsensor,2);
-    mensaje.replace(".",",");
+    String mensaje = String(vsensor,0);
+    // mensaje.replace(".",",");
     String topico = topico_raiz + "/Sensor/" + String(sensor);
     client.publish(topico.c_str(), mensaje.c_str());
+    doc["Sensor"][sensor-1] = mensaje;
 }
 
 int modulosEval(String modulo)
@@ -108,7 +119,7 @@ int modulosEval(String modulo)
 
 void confirmacion(int i, String mensaje)
 {
-    Serial.println("Mensaje enviado con exito!: "+modulos[i]+" -> "+ mensaje);
+    debugln("Mensaje enviado con exito!: "+modulos[i]+" -> "+ mensaje);
 }
 
 float adquisicionDatos(int ledPower, int measurePin)
@@ -130,9 +141,9 @@ float adquisicionDatos(int ledPower, int measurePin)
     // Chris Nafis (c) 2012
     dustDensity = 170 * calcVoltage - 0.1;
 
-    //Serial.print("Emision = ");
-    //Serial.print(dustDensity);
-    //Serial.println(" mg/m3 ");
+    //debug("Emision = ");
+    //debug(dustDensity);
+    //debugln(" mg/m3 ");
 
     return dustDensity;
 }

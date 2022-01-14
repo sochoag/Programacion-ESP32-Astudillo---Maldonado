@@ -1,26 +1,50 @@
 #include <Arduino.h>
+
+#define DEBUGLEVEL 1
+
+#if DEBUGLEVEL == 1 
+    #define debugln(x)
+    #define debug(x) 
+#elif DEBUGLEVEL == 0
+    #define debugln(x) Serial.println(x)
+    #define debug(x) Serial.print(x)
+#endif
+
+QueueHandle_t queue;
+BaseType_t xStatus;
+
 #include "secrets.h"
 #include "variables.h"
+#include "display.h"
 #include "functionsHeader.h"
 #include "conexionesInalambricas.h"
 #include "functions.h"
+
 
 void WatchdogConexiones(void *nada);
 void MaquinaPolling(void *nada);
 void SensoresPublish(void *nada);
 void AlertaTask(void *nada);
 void ExtractorTask(void *parameters);
+void SenderTask(void *parameters);
 
 void setup()
 {
     Serial.begin(115200);
+    Serial2.begin(115200);
+    queue = xQueueCreate(10, sizeof(char[300]));
+    if(queue == NULL){
+        debugln("Error creando el queue");
+    }
+    initValues();
     setup_connections();
     reconnect();
-    xTaskCreate(WatchdogConexiones, "MQTT_Task", 10240, NULL, 4, NULL);
+    xTaskCreate(WatchdogConexiones, "MQTT_Task", 10240, NULL, 3, NULL);
     xTaskCreate(SensoresPublish, "SensoresPublish", 10240, NULL, 2, NULL);
-    xTaskCreate(MaquinaPolling, "Maquina_Polling", 10240, NULL, 1, NULL);
+    xTaskCreate(MaquinaPolling, "Maquina_Polling", 10240, NULL,2, NULL);
     xTaskCreate(AlertaTask, "Task Alerta", 10240, NULL, 2, NULL);
     xTaskCreate(ExtractorTask, "Task Extractor", 10240, NULL, 2, NULL);
+    xTaskCreate(SenderTask, "Sender Task", 10240, NULL, 1, NULL);
 }
 
 void loop()
@@ -82,14 +106,15 @@ void SensoresPublish(void *nada)
             float valor = adquisicionDatos(digitalPinsSensor[i], analogPinsSensor[i]);
             fSensor(i + 1, valor);
         }
+        enviarDatos();
         vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
 }
 
 void AlertaTask(void *nada)
 {
-    bool lastValues[] = {false, false};
-    bool values[] = {true, true};
+    int conts[2] = {0,0};
+    String values[2] = {"V","V"};
 
     for (int i = 0; i < tamanoPinesMaquina; i++)
     {
@@ -100,12 +125,18 @@ void AlertaTask(void *nada)
     {
         for (int i = 0; i < tamanoPinesAlerta; i++)
         {
-            values[i] = digitalRead(pinesAlerta[i]);
-            if (lastValues[i] != values[i])
+            if (digitalRead(pinesAlerta[i]))
             {
-                fAlerta(i + 1, pinesAlerta[i]);
+                vTaskDelay(250 / portTICK_PERIOD_MS);
+                switch (conts[i])
+                {
+                    case 0: values[i] = "V"; conts[i]++; break;
+                    case 1: values[i] = "A"; conts[i]++; break;
+                    case 2: values[i] = "R"; conts[i] = 0; break;
+                    default: break;
+                }
+                fAlerta(i + 1, values[i]);
             }
-            lastValues[i] = values[i];
         }
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -136,4 +167,21 @@ void ExtractorTask(void *parameters)
         }
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
+}
+
+void SenderTask(void *parameters)
+{
+    while (true)
+    {
+        char elemento[300];
+        xStatus = xQueueReceive(queue, &elemento, portMAX_DELAY);
+        if(xStatus != errQUEUE_EMPTY)
+        {
+            Serial.println("Enviando desde Queue");
+            Serial.println(elemento);
+            Serial2.println(elemento);
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+    
 }

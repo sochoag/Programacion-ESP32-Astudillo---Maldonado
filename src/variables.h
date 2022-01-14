@@ -22,7 +22,7 @@ int pinesAlarma[]={26,27};
 
 int pinesMaquina[]={21,19};
 
-int pinesAlerta[]={16,25};
+int pinesAlerta[]={12,25};
 
 int pinesExtractor[]={34,15};
 

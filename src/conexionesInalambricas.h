@@ -32,16 +32,16 @@ void callback(char *topic, byte *payload, unsigned int length)
     case 4: confirmacion(4, mensaje); break;
     case 3: confirmacion(3, mensaje); break;
     case 5: confirmacion(5, mensaje); break;
-    default: Serial.println("No command"); break;
+    default: debugln("No command"); break;
   }
 }
 
 void setup_connections()
 {
   // Coneccion con la red Wifi -- We start by connecting to a WiFi network
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+  debugln();
+  debug("Connecting to ");
+  debugln(ssid);
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -49,15 +49,15 @@ void setup_connections()
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(500);
-    Serial.print(".");
+    debug(".");
   }
 
   randomSeed(micros());
 
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  debugln("");
+  debugln("WiFi connected");
+  debugln("IP address: ");
+  debugln(WiFi.localIP());
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 }
@@ -67,27 +67,27 @@ void reconnect()
   // Ciclo repetitivo hasta que se coecte al MQTT -- Loop until we're reconnected
   while (!client.connected())
   {
-    Serial.print("Attempting MQTT connection...");
+    debug("Attempting MQTT connection...");
     // Creacion de ID Random -- Create a random client ID
     String clientId = "ESP8266Client-";
     clientId += String(random(0xffff), HEX);
     // Intento de Conexion -- Attempt to connect
     if (client.connect(clientId.c_str()))
     {
-      Serial.println("connected");
+      debugln("connected");
 
       /////////////////////////Suscripcion a Topicos/////////////////////////////////////
       for (int i = 0; i < tamanoModulos; i++)
       {
         client.subscribe((topico_raiz + "/" + modulos[i] + "/#").c_str());
-        Serial.println("Suscrito a:" + topico_raiz + "/" + modulos[i] + "/#");
+        debugln("Suscrito a:" + topico_raiz + "/" + modulos[i] + "/#");
       }
     }
     else
     {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
+      debug("failed, rc=");
+      debug(client.state());
+      debugln(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       vTaskDelay(5000/portTICK_PERIOD_MS);
     }
