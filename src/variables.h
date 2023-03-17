@@ -16,11 +16,38 @@ char *token;
 
 String recepcion[3]={"","",""};
 
-int pinesLimpieza[]={18,19,21,22,23};
+int pinesLimpieza[]={22,23};
 
-int pinesAlarma[]={1,2,3,4,5,6,7,8,9,10};
+int pinesAlarma[]={26,27};
+
+int pinesMaquina[]={21,19};
+
+int pinesAlerta[]={12,25};
+
+int pinesExtractor[]={34,15};
+
+int digitalPinsSensor[] = {18,35};
+int analogPinsSensor[] = {32,33};
+
+int samplingTime = 280;
+int deltaTime = 40;
+int sleepTime = 9680;
+
+float voMeasured = 0;
+float calcVoltage = 0;
+float dustDensity = 0;
+
+String topico_raiz = "4e8ltVoiCa2o8u5";
+
+String modulos[] = {"Limpieza","Alarma","Maquina","Sensor","Alerta","Extractor"};
+
+const byte tamanoModulos = sizeof(modulos) / sizeof(modulos[0]);
 
 int tamanoPinesLimpieza = (sizeof(pinesLimpieza)/sizeof(pinesLimpieza[0]));
 int tamanoPinesAlarma = (sizeof(pinesAlarma)/sizeof(pinesAlarma[0]));
+int tamanoPinesMaquina = (sizeof(pinesMaquina)/sizeof(pinesMaquina[0]));
+int tamanoPinesSensor = (sizeof(digitalPinsSensor)/sizeof(digitalPinsSensor[0]));
+int tamanoPinesAlerta = (sizeof(pinesAlerta)/sizeof(pinesAlerta[0]));
+int tamanoPinesExtractor = (sizeof(pinesExtractor)/sizeof(pinesExtractor[0]));
 
 #endif

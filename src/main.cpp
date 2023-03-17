@@ -1,99 +1,187 @@
 #include <Arduino.h>
+
+#define DEBUGLEVEL 1
+
+#if DEBUGLEVEL == 1 
+    #define debugln(x)
+    #define debug(x) 
+#elif DEBUGLEVEL == 0
+    #define debugln(x) Serial.println(x)
+    #define debug(x) Serial.print(x)
+#endif
+
+QueueHandle_t queue;
+BaseType_t xStatus;
+
 #include "secrets.h"
 #include "variables.h"
+#include "display.h"
+#include "functionsHeader.h"
 #include "conexionesInalambricas.h"
-#include "Estaciones.h"
-#include "Maquinas.h"
-#include "Alarma.h"
-#include "Limpieza.h"
+#include "functions.h"
 
-void callback(char* topic, byte* payload, unsigned int length) 
+
+void WatchdogConexiones(void *nada);
+void MaquinaPolling(void *nada);
+void SensoresPublish(void *nada);
+void AlertaTask(void *nada);
+void ExtractorTask(void *parameters);
+void SenderTask(void *parameters);
+
+void setup()
 {
-  // Tokening del topic
-  int it=0;
-  token = strtok(topic, "/");
-  recepcion[it] = token;
-  while(token != NULL)
-  {
-    it++;
-    //Serial.println(token);
-    token = strtok(NULL, "/");
-    recepcion[it] = token;
-  }
-
-  // Lectura del mensaje
-  String mensaje;
-  for (int i = 0; i < length; i++) {
-    mensaje = mensaje+(char)payload[i];
-  }
-  //Serial.println("Topico:"+String(topic)+"\t Mensaje:"+mensaje);
-
-  // Logica del programa
-  if(recepcion[0]==topico_raiz)
-  {
-    if(recepcion[1]==modulos[0])
-    {
-      Serial.println("Estas en el modulo:Limpieza");
-      if(recepcion[2].toInt() >= 1 && recepcion[2].toInt() <= tamanoPinesLimpieza)
-      {
-        fLimpieza(recepcion[2].toInt(), mensaje);
-      }
-      else
-      {
-        Serial.println("No existe el elemento");
-      }
+    Serial.begin(115200);
+    Serial2.begin(115200);
+    queue = xQueueCreate(10, sizeof(char[300]));
+    if(queue == NULL){
+        debugln("Error creando el queue");
     }
-    if(recepcion[1]==modulos[1])
-    {
-      Serial.println("Estas en el modulo:Alarma");
-      fAlarma(mensaje);
-    }
-    // if(recepcion[1]==modulos[2])
-    // {
-    //   Serial.println("Estas en el modulo:Maquina");
-    // }
-    if(recepcion[1]==modulos[3])
-    {
-      Serial.println("Estas en el modulo:Sensor");
-    }
-    if(recepcion[1]==modulos[4])
-    {
-      Serial.println("Estas en el modulo:Alerta");
-    }
-  }
-}
-
-void setup ()
-{  
-  Serial.begin(115200);
-////////////////////////////Pines Usados ///////////////////////////////
-  
-  pinMode(15,INPUT);        //Maqquina1--Pulsante
-  pinMode(16,INPUT);        //Maqquina2--Pulsante
-  initLimpieza();
-  //initAlarma();           //Descomentar cuando se tenga los pines que son
-
-
-/////////////////////////////////////////////////////////////////////////  
-  setup_wifi();
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
-}
-
-void loop() 
-{
-  if (!client.connected()) 
-  {
+    initValues();
+    setup_connections();
     reconnect();
-  }
-  unsigned long now = millis();
+    xTaskCreate(WatchdogConexiones, "MQTT_Task", 10240, NULL, 3, NULL);
+    xTaskCreate(SensoresPublish, "SensoresPublish", 10240, NULL, 2, NULL);
+    xTaskCreate(MaquinaPolling, "Maquina_Polling", 10240, NULL,2, NULL);
+    xTaskCreate(AlertaTask, "Task Alerta", 10240, NULL, 2, NULL);
+    xTaskCreate(ExtractorTask, "Task Extractor", 10240, NULL, 2, NULL);
+    xTaskCreate(SenderTask, "Sender Task", 10240, NULL, 1, NULL);
+}
 
-  // Envio de datos desde ESP hacia el broker cada 2 segundos
-  if ((now - lastMsg) > 5000) 
-  {
-    lastMsg = now;
-    activarMaquina(1, estadoMaquina);
-    estadoMaquina = !estadoMaquina;
-  }
-  client.loop();
+void loop()
+{
+}
+
+void WatchdogConexiones(void *nada)
+{
+    while (true)
+    {
+        if (!client.connected())
+        {
+            reconnect();
+        }
+        client.loop();
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+}
+
+void MaquinaPolling(void *nada)
+{
+    bool lastValues[] = {false, false};
+    bool values[] = {true, true};
+
+    for (int i = 0; i < tamanoPinesMaquina; i++)
+    {
+        pinMode(pinesMaquina[i], INPUT);
+    }
+
+    while (true)
+    {
+        for (int i = 0; i < tamanoPinesMaquina; i++)
+        {
+            values[i] = digitalRead(pinesMaquina[i]);
+            if (lastValues[i] != values[i])
+            {
+                fMaquina(i + 1, pinesMaquina[i]);
+            }
+
+            lastValues[i] = values[i];
+        }
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+void SensoresPublish(void *nada)
+{
+    for (int i = 0; i < tamanoPinesSensor; i++)
+    {
+        pinMode(digitalPinsSensor[i], OUTPUT);
+        pinMode(analogPinsSensor[i], INPUT);
+    }
+
+    while (true)
+    {
+        for (int i = 0; i < tamanoPinesSensor; i++)
+        {
+            float valor = adquisicionDatos(digitalPinsSensor[i], analogPinsSensor[i]);
+            fSensor(i + 1, valor);
+        }
+        enviarDatos();
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
+    }
+}
+
+void AlertaTask(void *nada)
+{
+    int conts[2] = {0,0};
+    String values[2] = {"V","V"};
+
+    for (int i = 0; i < tamanoPinesMaquina; i++)
+    {
+        pinMode(pinesAlerta[i], INPUT);
+    }
+
+    while (true)
+    {
+        for (int i = 0; i < tamanoPinesAlerta; i++)
+        {
+            if (digitalRead(pinesAlerta[i]))
+            {
+                vTaskDelay(250 / portTICK_PERIOD_MS);
+                switch (conts[i])
+                {
+                    case 0: values[i] = "V"; conts[i]++; break;
+                    case 1: values[i] = "A"; conts[i]++; break;
+                    case 2: values[i] = "R"; conts[i] = 0; break;
+                    default: break;
+                }
+                fAlerta(i + 1, values[i]);
+            }
+        }
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+void ExtractorTask(void *parameters)
+{
+    bool lastValues[] = {false, false};
+    bool values[] = {true, true};
+
+    for (int i = 0; i < tamanoPinesExtractor; i++)
+    {
+        pinMode(pinesExtractor[i], INPUT);
+    }
+
+    while (true)
+    {
+        for (int i = 0; i < tamanoPinesExtractor; i++)
+        {
+            values[i] = digitalRead(pinesExtractor[i]);
+            if (lastValues[i] != values[i])
+            {
+                fExtractor(i + 1, pinesExtractor[i]);
+            }
+
+            lastValues[i] = values[i];
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+void SenderTask(void *parameters)
+{
+    while (true)
+    {
+        char elemento[300];
+        xStatus = xQueueReceive(queue, &elemento, portMAX_DELAY);
+        if(xStatus != errQUEUE_EMPTY)
+        {
+            Serial.println("Enviando desde Queue");
+            Serial.println(elemento);
+            Serial2.println(elemento);
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+    
 }
